@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>单词消消乐（离线）</title>
+  <style>
+    :root{
+      --bg: #fff5bf;
+      --panel: rgba(255,255,255,.65);
+      --shadow2: rgba(0,0,0,.10);
+      --text: #1f2937;
+      --dark: #111827;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      background: radial-gradient(circle at 20% 10%, rgba(255,255,255,.7), transparent 45%),
+                  radial-gradient(circle at 85% 25%, rgba(255,255,255,.55), transparent 40%),
+                  radial-gradient(circle at 30% 85%, rgba(255,255,255,.6), transparent 45%),
+                  var(--bg);
+      color: var(--text);
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding: 22px 16px 28px;
+    }
+
+    h1{
+      margin: 6px 0 10px;
+      font-size: clamp(34px, 4vw, 52px);
+      letter-spacing: 2px;
+      font-weight: 900;
+      text-shadow: 0 2px 0 rgba(255,255,255,.7);
+    }
+
+    .topbar{
+      width:min(1200px, 100%);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 10px 24px var(--shadow2);
+      backdrop-filter: blur(6px);
+      flex-wrap: wrap;
+    }
+
+    .status{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 10px;
+      align-items:center;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .pill{
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.75);
+      box-shadow: 0 6px 14px rgba(0,0,0,.08);
+      border: 1px solid rgba(0,0,0,.06);
+      white-space: nowrap;
+    }
+
+    .btnrow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap: wrap;
+    }
+
+    .btn{
+      cursor:pointer;
+      border:none;
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-weight: 900;
+      font-size: 15px;
+      background: var(--dark);
+      color:#fff;
+      box-shadow: 0 10px 20px rgba(0,0,0,.18);
+      transition: transform .08s ease, filter .08s ease, opacity .12s ease;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px) scale(.99); filter: brightness(.98); }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .btn.secondary{
+      background: rgba(255,255,255,.85);
+      color: var(--dark);
+      border: 1px solid rgba(0,0,0,.12);
+    }
+    .btn.warn{
+      background: #b91c1c;
+    }
+
+    .board-wrap{
+      width:min(1200px, 100%);
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 22px;
+      padding: 16px 16px 18px;
+      box-shadow: 0 16px 30px rgba(0,0,0,.12);
+      backdrop-filter: blur(6px);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+      padding: 10px;
+      align-items: stretch;
+    }
+
+    .bubble{
+      position:relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding: 10px;
+      cursor:pointer;
+      user-select:none;
+      box-shadow:
+        0 18px 26px rgba(0,0,0,.18),
+        0 6px 0 rgba(0,0,0,.10),
+        inset 0 10px 18px rgba(255,255,255,.45),
+        inset 0 -10px 18px rgba(0,0,0,.10);
+      border: 2px solid rgba(255,255,255,.45);
+      transform: translateZ(0);
+      transition: transform .12s ease, filter .12s ease, box-shadow .12s ease, outline .12s ease;
+      overflow:hidden;
+    }
+
+    .bubble::before{
+      content:"";
+      position:absolute;
+      inset: 10% 10% auto auto;
+      width: 36%;
+      height: 36%;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.95), rgba(255,255,255,.2) 55%, transparent 70%);
+      opacity: .9;
+      pointer-events:none;
+    }
+
+    .bubble::after{
+      content:"";
+      position:absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 55%);
+      pointer-events:none;
+      mix-blend-mode: screen;
+    }
+
+    .bubble:hover{
+      transform: translateY(-2px);
+      filter: brightness(1.03);
+    }
+
+    .bubble.selected{
+      outline: 6px solid rgba(17,24,39,.18);
+      box-shadow:
+        0 22px 34px rgba(0,0,0,.22),
+        0 8px 0 rgba(0,0,0,.12),
+        inset 0 10px 18px rgba(255,255,255,.50),
+        inset 0 -10px 18px rgba(0,0,0,.10);
+      transform: translateY(-3px) scale(1.02);
+    }
+
+    .bubble.hint{
+      outline: 6px solid rgba(16,185,129,.25);
+      transform: translateY(-3px) scale(1.03);
+      filter: brightness(1.06);
+    }
+
+    .bubble.matched{
+      visibility:hidden;
+      pointer-events:none;
+    }
+
+    .bubble span{
+      position:relative;
+      z-index:1;
+      font-weight: 900;
+      font-size: clamp(18px, 1.8vw, 26px);
+      line-height: 1.12;
+      text-shadow: 0 1px 0 rgba(255,255,255,.35);
+      color: rgba(0,0,0,.80);
+      word-break: break-word;
+    }
+
+    .overlay{
+      margin-top: 12px;
+      padding: 14px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 12px 24px rgba(0,0,0,.10);
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+    }
+
+    .msg{
+      font-size: 17px;
+      font-weight: 900;
+    }
+    .hintText{
+      font-size: 14px;
+      opacity: .85;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .result{
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 10px 20px rgba(0,0,0,.10);
+      display:none;
+    }
+    .result.show{ display:block; }
+    .stars{
+      font-size: 26px;
+      letter-spacing: 2px;
+      margin: 6px 0 8px;
+    }
+    .resultLine{
+      font-weight: 900;
+      margin: 4px 0;
+    }
+
+    @media (max-width: 820px){
+      .grid{ grid-template-columns: repeat(3, 1fr); }
+      /* 手机上自动3列更好点；若你坚持手机也必须6列，删掉这段媒体查询 */
+    }
+  </style>
+</head>
+
+<body>
+  <h1>单词消消乐</h1>
+
+  <div class="topbar">
+    <div class="status">
+      <div class="pill" id="levelPill">等级：1（Cambridge 1）</div>
+      <div class="pill" id="themePill">主题：Food 食物</div>
+      <div class="pill" id="roundPill">关卡：1</div>
+      <div class="pill" id="timePill">用时：0.0s</div>
+      <div class="pill" id="leftPill">剩余泡泡：18</div>
+      <div class="pill" id="scorePill">得分：0</div>
+      <div class="pill" id="comboPill">连击：0</div>
+      <div class="pill" id="errorPill">错误：0</div>
+      <div class="pill" id="hintPill">提示：0</div>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn secondary" id="speakToggleBtn" title="有些浏览器需要先点击页面才能朗读">朗读：开</button>
+      <button class="btn warn" id="hintBtn" title="先选中一个泡泡再点提示（扣分并清空连击）">提示（-30分）</button>
+      <button class="btn secondary" id="restartBtn">重新开始</button>
+      <button class="btn" id="nextBtn" disabled>继续挑战</button>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="grid" id="grid"></div>
+
+    <div class="overlay">
+      <div>
+        <div class="msg" id="msg">点击一个泡泡会朗读；连续点击两个泡泡尝试配对。</div>
+        <div class="hintText">规则：英文 ↔ 中文含义一致即配对成功；连击越高，得分越多。</div>
+      </div>
+    </div>
+
+    <div class="result" id="resultBox">
+      <div class="msg">🎉 恭喜你挑战成功！</div>
+      <div class="stars" id="starsLine">⭐⭐⭐</div>
+      <div class="resultLine" id="resultStats1"></div>
+      <div class="resultLine" id="resultStats2"></div>
+      <div class="resultLine" id="resultStats3"></div>
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * 主题定义（会轮换）
+     ***********************/
+    const THEMES = [
+      { id:"food",   zh:"食物",     en:"Food" },
+      { id:"animals",zh:"动物",     en:"Animals" },
+      { id:"school", zh:"学校",     en:"School" },
+      { id:"home",   zh:"家庭/家",  en:"Home" },
+      { id:"weather",zh:"天气",     en:"Weather" },
+      { id:"places", zh:"地点",     en:"Places" },
+      { id:"actions",zh:"动作",     en:"Actions" },
+      { id:"feelings",zh:"感受",    en:"Feelings" },
+      { id:"travel", zh:"旅行",     en:"Travel" },
+    ];
+
+    /***********************
+     * 词库：Cambridge 少儿英语 1-3 级（按主题分类）
+     * 每条是一个“概念”，每关抽9个概念 -> 18泡泡（英文+中文）
+     ***********************/
+    const WORD_BANK = [
+      // Level 1
+      { level:1, theme:"food",    en:"apple", zh:"苹果" },
+      { level:1, theme:"food",    en:"banana", zh:"香蕉" },
+      { level:1, theme:"food",    en:"milk", zh:"牛奶" },
+      { level:1, theme:"food",    en:"bread", zh:"面包" },
+      { level:1, theme:"food",    en:"egg", zh:"鸡蛋" },
+      { level:1, theme:"food",    en:"cake", zh:"蛋糕" },
+      { level:1, theme:"food",    en:"water", zh:"水" },
+      { level:1, theme:"food",    en:"rice", zh:"米饭" },
+
+      { level:1, theme:"animals", en:"cat", zh:"猫" },
+      { level:1, theme:"animals", en:"dog", zh:"狗" },
+      { level:1, theme:"animals", en:"fish", zh:"鱼" },
+      { level:1, theme:"animals", en:"bird", zh:"鸟" },
+
+      { level:1, theme:"school",  en:"book", zh:"书" },
+      { level:1, theme:"school",  en:"pen", zh:"钢笔" },
+      { level:1, theme:"school",  en:"pencil", zh:"铅笔" },
+
+      { level:1, theme:"home",    en:"chair", zh:"椅子" },
+      { level:1, theme:"home",    en:"table", zh:"桌子" },
+      { level:1, theme:"home",    en:"door", zh:"门" },
+      { level:1, theme:"home",    en:"window", zh:"窗户" },
+
+      { level:1, theme:"places",  en:"park", zh:"公园" },
+      { level:1, theme:"places",  en:"shop", zh:"商店" },
+
+      { level:1, theme:"actions", en:"run", zh:"跑" },
+      { level:1, theme:"actions", en:"jump", zh:"跳" },
+      { level:1, theme:"actions", en:"read", zh:"读" },
+      { level:1, theme:"actions", en:"write", zh:"写" },
+
+      { level:1, theme:"feelings", en:"happy", zh:"开心" },
+      { level:1, theme:"feelings", en:"sad", zh:"难过" },
+
+      { level:1, theme:"weather", en:"sunny", zh:"晴朗的" },
+      { level:1, theme:"weather", en:"rainy", zh:"下雨的" },
+
+      // Level 2
+      { level:2, theme:"food", en:"breakfast", zh:"早餐" },
+      { level:2, theme:"food", en:"lunch", zh:"午餐" },
+      { level:2, theme:"food", en:"dinner", zh:"晚餐" },
+      { level:2, theme:"food", en:"juice", zh:"果汁" },
+      { level:2, theme:"food", en:"sandwich", zh:"三明治" },
+
+      { level:2, theme:"home", en:"kitchen", zh:"厨房" },
+      { level:2, theme:"home", en:"bathroom", zh:"浴室" },
+      { level:2, theme:"home", en:"bedroom", zh:"卧室" },
+      { level:2, theme:"home", en:"garden", zh:"花园" },
+
+      { level:2, theme:"school", en:"teacher", zh:"老师" },
+      { level:2, theme:"school", en:"student", zh:"学生" },
+      { level:2, theme:"school", en:"homework", zh:"作业" },
+      { level:2, theme:"school", en:"picture", zh:"图片" },
+
+      { level:2, theme:"places", en:"library", zh:"图书馆" },
+      { level:2, theme:"places", en:"hospital", zh:"医院" },
+      { level:2, theme:"places", en:"station", zh:"车站" },
+      { level:2, theme:"places", en:"supermarket", zh:"超市" },
+
+      { level:2, theme:"actions", en:"swimming", zh:"游泳" },
+      { level:2, theme:"actions", en:"drawing", zh:"画画" },
+      { level:2, theme:"actions", en:"reading", zh:"阅读" },
+      { level:2, theme:"actions", en:"listening", zh:"听" },
+
+      { level:2, theme:"weather", en:"cloudy", zh:"多云" },
+      { level:2, theme:"weather", en:"windy", zh:"有风的" },
+      { level:2, theme:"weather", en:"snowy", zh:"下雪的" },
+
+      { level:2, theme:"animals", en:"rabbit", zh:"兔子" },
+      { level:2, theme:"animals", en:"horse", zh:"马" },
+      { level:2, theme:"animals", en:"duck", zh:"鸭子" },
+
+      { level:2, theme:"feelings", en:"hungry", zh:"饿的" },
+      { level:2, theme:"feelings", en:"tired", zh:"累的" },
+
+      // Level 3
+      { level:3, theme:"travel", en:"travelling", zh:"旅行" },
+      { level:3, theme:"travel", en:"holiday", zh:"假期" },
+      { level:3, theme:"travel", en:"ticket", zh:"票" },
+      { level:3, theme:"travel", en:"direction", zh:"方向" },
+
+      { level:3, theme:"places", en:"museum", zh:"博物馆" },
+      { level:3, theme:"places", en:"restaurant", zh:"餐厅" },
+      { level:3, theme:"places", en:"bridge", zh:"桥" },
+
+      { level:3, theme:"animals", en:"dolphin", zh:"海豚" },
+      { level:3, theme:"animals", en:"tiger", zh:"老虎" },
+
+      { level:3, theme:"weather", en:"stormy", zh:"暴风雨的" },
+
+      { level:3, theme:"actions", en:"remember", zh:"记得" },
+      { level:3, theme:"actions", en:"forget", zh:"忘记" },
+      { level:3, theme:"actions", en:"invite", zh:"邀请" },
+      { level:3, theme:"actions", en:"decide", zh:"决定" },
+      { level:3, theme:"actions", en:"practice", zh:"练习" },
+
+      { level:3, theme:"feelings", en:"excited", zh:"兴奋的" },
+      { level:3, theme:"feelings", en:"surprised", zh:"惊讶的" },
+
+      { level:3, theme:"school", en:"question", zh:"问题" },
+      { level:3, theme:"school", en:"answer", zh:"回答" },
+
+      { level:3, theme:"food", en:"delicious", zh:"美味的" },
+      { level:3, theme:"food", en:"customer", zh:"顾客" },
+
+      { level:3, theme:"travel", en:"adventure", zh:"冒险" },
+      { level:3, theme:"travel", en:"island", zh:"岛" },
+      { level:3, theme:"travel", en:"mountain", zh:"山" },
+      { level:3, theme:"travel", en:"forest", zh:"森林" },
+      { level:3, theme:"travel", en:"river", zh:"河流" },
+
+      { level:3, theme:"feelings", en:"important", zh:"重要的" },
+      { level:3, theme:"feelings", en:"different", zh:"不同的" },
+      { level:3, theme:"feelings", en:"dangerous", zh:"危险的" },
+      { level:3, theme:"feelings", en:"careful", zh:"小心的" },
+    ];
+
+    /***********************
+     * 游戏配置
+     ***********************/
+    const PAIRS_PER_ROUND = 9; // 9对 => 18泡泡（6x3）
+    const ROWS = 3;
+    const COLS = 6;
+
+    // 状态
+    let currentLevel = 1;
+    let round = 1;
+    let themeIndex = 0;
+
+    // 用于“与上一关不重复”：按等级分别记录（更贴合孩子学习）
+    let usedKeysByLevel = {
+      1: new Set(),
+      2: new Set(),
+      3: new Set(),
+    };
+
+    let items = [];
+    let bubbles = [];
+    let firstPick = null;
+    let lock = false;
+
+    // 计时
+    let t0 = 0;
+    let timer = null;
+    let elapsed = 0;
+
+    // 朗读
+    let speakEnabled = true;
+
+    // 计分/统计
+    let score = 0;
+    let combo = 0;
+    let errors = 0;
+    let hintsUsed = 0;
+    let roundCleared = false;
+
+    // DOM
+    const gridEl = document.getElementById("grid");
+    const msgEl = document.getElementById("msg");
+    const levelPill = document.getElementById("levelPill");
+    const themePill = document.getElementById("themePill");
+    const roundPill = document.getElementById("roundPill");
+    const timePill = document.getElementById("timePill");
+    const leftPill = document.getElementById("leftPill");
+    const scorePill = document.getElementById("scorePill");
+    const comboPill = document.getElementById("comboPill");
+    const errorPill = document.getElementById("errorPill");
+    const hintPill = document.getElementById("hintPill");
+
+    const nextBtn = document.getElementById("nextBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const speakToggleBtn = document.getElementById("speakToggleBtn");
+    const hintBtn = document.getElementById("hintBtn");
+
+    const resultBox = document.getElementById("resultBox");
+    const starsLine = document.getElementById("starsLine");
+    const resultStats1 = document.getElementById("resultStats1");
+    const resultStats2 = document.getElementById("resultStats2");
+    const resultStats3 = document.getElementById("resultStats3");
+
+    /***********************
+     * 工具：随机 & 洗牌
+     ***********************/
+    function randInt(min, max){
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    function shuffle(arr){
+      for(let i = arr.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    /***********************
+     * 泡泡颜色
+     ***********************/
+    function randomBubbleGradient(){
+      const h = randInt(0, 359);
+      const s = randInt(72, 92);
+      const l1 = randInt(54, 68);
+      const l2 = l1 - randInt(10, 16);
+      return `radial-gradient(circle at 30% 25%,
+        hsla(${h}, ${s}%, ${l1+18}%, 0.95),
+        hsla(${h}, ${s}%, ${l1}%, 0.95) 45%,
+        hsla(${h}, ${s}%, ${l2}%, 0.95) 78%,
+        hsla(${h}, ${s}%, ${l2-8}%, 0.95)
+      )`;
+    }
+
+    /***********************
+     * 声音：WebAudio（离线）
+     ***********************/
+    let audioCtx = null;
+    function getAudio(){
+      if(!audioCtx){
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+    function playTone({type="sine", freq=880, dur=0.12, gain=0.08}){
+      const ctx = getAudio();
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+      osc.connect(g);
+      g.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    }
+    function soundSuccess(){
+      playTone({type:"triangle", freq: 880, dur: 0.10, gain: 0.08});
+      setTimeout(()=> playTone({type:"triangle", freq: 1320, dur: 0.12, gain: 0.08}), 90);
+    }
+    function soundFail(){
+      playTone({type:"sawtooth", freq: 220, dur: 0.18, gain: 0.06});
+      setTimeout(()=> playTone({type:"sawtooth", freq: 170, dur: 0.18, gain: 0.05}), 80);
+    }
+    function soundHint(){
+      playTone({type:"sine", freq: 660, dur: 0.08, gain: 0.05});
+      setTimeout(()=> playTone({type:"sine", freq: 880, dur: 0.10, gain: 0.05}), 70);
+    }
+
+    /***********************
+     * 朗读：SpeechSynthesis（离线可用）
+     ***********************/
+    function speak(text){
+      if(!speakEnabled) return;
+      if(!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const isZh = /[\u4e00-\u9fff]/.test(text);
+      u.lang = isZh ? "zh-CN" : "en-US";
+      u.rate = isZh ? 0.95 : 0.92;
+      u.pitch = 1.05;
+      u.volume = 1.0;
+      window.speechSynthesis.speak(u);
+    }
+
+    /***********************
+     * 主题 & 等级
+     ***********************/
+    function levelLabel(lv){
+      if(lv === 1) return "等级：1（Cambridge 1）";
+      if(lv === 2) return "等级：2（Cambridge 2）";
+      return "等级：3（Cambridge 3）";
+    }
+    function currentTheme(){
+      return THEMES[themeIndex % THEMES.length];
+    }
+
+    function makeKey(w){
+      return `${w.level}::${w.theme}::${w.en.toLowerCase()}`;
+    }
+
+    function getPool(level, themeId){
+      return WORD_BANK
+        .filter(w => w.level === level && w.theme === themeId)
+        .map(w => ({...w, key: makeKey(w)}));
+    }
+
+    function pickConceptsForRound(){
+      const th = currentTheme();
+      let pool = getPool(currentLevel, th.id);
+      let used = usedKeysByLevel[currentLevel];
+      let remaining = pool.filter(x => !used.has(x.key));
+
+      // 如果该主题在该等级词不够/用完：自动换下一个主题
+      let guard = 0;
+      while(remaining.length < PAIRS_PER_ROUND && guard < THEMES.length){
+        themeIndex += 1;
+        guard += 1;
+        const th2 = currentTheme();
+        pool = getPool(currentLevel, th2.id);
+        remaining = pool.filter(x => !used.has(x.key));
+      }
+
+      // 如果整个等级都不够（比如主题都试完还不够）：升级等级/或循环重置
+      if(remaining.length < PAIRS_PER_ROUND){
+        if(currentLevel < 3){
+          currentLevel += 1;
+          themeIndex += 1; // 升级后也换个主题
+          // 新等级开始前清空其 used（可重复玩，但同等级内尽量不重复）
+          usedKeysByLevel[currentLevel] = usedKeysByLevel[currentLevel] || new Set();
+          used = usedKeysByLevel[currentLevel];
+
+          pool = getPool(currentLevel, currentTheme().id);
+          remaining = pool.filter(x => !used.has(x.key));
+
+          // 仍不够则继续换主题
+          let g2 = 0;
+          while(remaining.length < PAIRS_PER_ROUND && g2 < THEMES.length){
+            themeIndex += 1;
+            g2 += 1;
+            pool = getPool(currentLevel, currentTheme().id);
+            remaining = pool.filter(x => !used.has(x.key));
+          }
+        } else {
+          // 全部等级都玩了一轮：从头循环
+          currentLevel = 1;
+          round = 1;
+          themeIndex = 0;
+          usedKeysByLevel = { 1:new Set(), 2:new Set(), 3:new Set() };
+
+          pool = getPool(currentLevel, currentTheme().id);
+          remaining = pool;
+        }
+      }
+
+      shuffle(remaining);
+      const chosen = remaining.slice(0, PAIRS_PER_ROUND);
+      chosen.forEach(c => usedKeysByLevel[currentLevel].add(c.key));
+      return chosen;
+    }
+
+    /***********************
+     * 计时
+     ***********************/
+    function resetTimer(){
+      if(timer) clearInterval(timer);
+      elapsed = 0;
+      timePill.textContent = `用时：0.0s`;
+      t0 = performance.now();
+      timer = setInterval(()=>{
+        elapsed = (performance.now() - t0) / 1000;
+        timePill.textContent = `用时：${elapsed.toFixed(1)}s`;
+      }, 100);
+    }
+
+    /***********************
+     * 计分规则（可自行改）
+     * - 成功：基础 50 分 + 连击加成（每连击 +10）
+     * - 失败：-10 分（最低不低于0），连击清零
+     * - 提示：-30 分（最低不低于0），连击清零
+     ***********************/
+    function addScore(n){
+      score = Math.max(0, score + n);
+      scorePill.textContent = `得分：${score}`;
+    }
+    function setCombo(n){
+      combo = n;
+      comboPill.textContent = `连击：${combo}`;
+    }
+    function incErrors(){
+      errors += 1;
+      errorPill.textContent = `错误：${errors}`;
+    }
+    function incHints(){
+      hintsUsed += 1;
+      hintPill.textContent = `提示：${hintsUsed}`;
+    }
+
+    /***********************
+     * UI 更新
+     ***********************/
+    function updateTop(){
+      const th = currentTheme();
+      levelPill.textContent = levelLabel(currentLevel);
+      themePill.textContent = `主题：${th.en} ${th.zh}`;
+      roundPill.textContent = `关卡：${round}`;
+      const left = bubbles.filter(b => !b.matched).length;
+      leftPill.textContent = `剩余泡泡：${left}`;
+      scorePill.textContent = `得分：${score}`;
+      comboPill.textContent = `连击：${combo}`;
+      errorPill.textContent = `错误：${errors}`;
+      hintPill.textContent = `提示：${hintsUsed}`;
+    }
+
+    function showResult(){
+      // 评星：综合用时/错误/提示
+      // 你也可以按孩子年龄调整阈值
+      let stars = 3;
+
+      if(hintsUsed > 0) stars -= 1;
+      if(errors >= 4) stars -= 1;
+      if(elapsed > 80) stars -= 1;
+
+      stars = Math.max(0, Math.min(3, stars));
+      starsLine.textContent = "⭐".repeat(stars) + "☆".repeat(3 - stars);
+
+      resultStats1.textContent = `用时：${elapsed.toFixed(1)} 秒   |   得分：${score}`;
+      resultStats2.textContent = `错误次数：${errors}   |   提示次数：${hintsUsed}`;
+      resultStats3.textContent = `等级：${currentLevel}   |   主题：${currentTheme().en} ${currentTheme().zh}`;
+
+      resultBox.classList.add("show");
+    }
+
+    function hideResult(){
+      resultBox.classList.remove("show");
+    }
+
+    /***********************
+     * 渲染 & 交互
+     ***********************/
+    function buildRound(){
+      firstPick = null;
+      lock = false;
+      roundCleared = false;
+
+      nextBtn.disabled = true;
+      msgEl.textContent = "点击一个泡泡会朗读；连续点击两个泡泡尝试配对。";
+      hideResult();
+
+      // 本关统计重置（也可以改成跨关累计）
+      score = 0;
+      combo = 0;
+      errors = 0;
+      hintsUsed = 0;
+
+      items = pickConceptsForRound();
+
+      // 生成 18 个泡泡：每个概念英文+中文各一个
+      bubbles = [];
+      items.forEach((c, idx)=>{
+        const id = `${currentLevel}-${round}-${idx}-${c.en}`;
+        bubbles.push({ id, pairKey: id, text: c.en, lang: "en", matched:false, color: randomBubbleGradient() });
+        bubbles.push({ id, pairKey: id, text: c.zh, lang: "zh", matched:false, color: randomBubbleGradient() });
+      });
+
+      shuffle(bubbles);
+
+      // 渲染
+      gridEl.innerHTML = "";
+      bubbles.forEach((b, i)=>{
+        const div = document.createElement("div");
+        div.className = "bubble";
+        div.style.background = b.color;
+        div.dataset.index = String(i);
+
+        const span = document.createElement("span");
+        span.textContent = b.text;
+        div.appendChild(span);
+
+        div.addEventListener("click", onBubbleClick);
+        gridEl.appendChild(div);
+      });
+
+      updateTop();
+      resetTimer();
+    }
+
+    function clearSelectionUI(){
+      const els = gridEl.querySelectorAll(".bubble.selected");
+      els.forEach(el => el.classList.remove("selected"));
+    }
+    function clearHintUI(){
+      const els = gridEl.querySelectorAll(".bubble.hint");
+      els.forEach(el => el.classList.remove("hint"));
+    }
+
+    function markMatched(indexA, indexB){
+      bubbles[indexA].matched = true;
+      bubbles[indexB].matched = true;
+
+      const elA = gridEl.querySelector(`.bubble[data-index="${indexA}"]`);
+      const elB = gridEl.querySelector(`.bubble[data-index="${indexB}"]`);
+      if(elA) elA.classList.add("matched");
+      if(elB) elB.classList.add("matched");
+    }
+
+    function checkWin(){
+      const left = bubbles.filter(b => !b.matched).length;
+      updateTop();
+      if(left === 0){
+        if(timer) clearInterval(timer);
+        roundCleared = true;
+        msgEl.textContent = `🎉 恭喜你挑战成功！用时 ${elapsed.toFixed(1)} 秒。`;
+        nextBtn.disabled = false;
+        showResult();
+      }
+    }
+
+    function onBubbleClick(e){
+      if(lock || roundCleared) return;
+
+      clearHintUI();
+
+      const el = e.currentTarget;
+      const idx = Number(el.dataset.index);
+      const b = bubbles[idx];
+      if(b.matched) return;
+
+      // 高亮 + 朗读
+      clearSelectionUI();
+      el.classList.add("selected");
+      speak(b.text);
+
+      // 选第一个
+      if(!firstPick){
+        firstPick = { idx, pairKey: b.pairKey };
+        return;
+      }
+
+      // 点同一个：当作仍选第一个
+      if(firstPick.idx === idx){
+        return;
+      }
+
+      const secondPick = { idx, pairKey: b.pairKey };
+
+      // 匹配成功
+      if(firstPick.pairKey === secondPick.pairKey){
+        soundSuccess();
+
+        // 计分：基础50 + 连击加成
+        const gained = 50 + combo * 10;
+        addScore(gained);
+        setCombo(combo + 1);
+
+        markMatched(firstPick.idx, secondPick.idx);
+        firstPick = null;
+        clearSelectionUI();
+        checkWin();
+      } else {
+        // 不匹配：泡泡保持原状
+        soundFail();
+        lock = true;
+
+        incErrors();
+        addScore(-10);
+        setCombo(0);
+
+        const el1 = gridEl.querySelector(`.bubble[data-index="${firstPick.idx}"]`);
+        const el2 = gridEl.querySelector(`.bubble[data-index="${secondPick.idx}"]`);
+        if(el1) el1.classList.add("selected");
+        if(el2) el2.classList.add("selected");
+
+        setTimeout(()=>{
+          clearSelectionUI();
+          firstPick = null;
+          lock = false;
+        }, 520);
+      }
+    }
+
+    /***********************
+     * 提示（需要先选中一个泡泡）
+     * 效果：短暂高亮它的匹配泡泡（不直接消除）
+     * 代价：-30分 + 清零连击 + 提示次数+1
+     ***********************/
+    function useHint(){
+      if(lock || roundCleared) return;
+      if(!firstPick) {
+        msgEl.textContent = "先点选一个泡泡，再点“提示”哦～";
+        return;
+      }
+
+      // 扣分 + 统计
+      incHints();
+      addScore(-30);
+      setCombo(0);
+      soundHint();
+
+      const targetKey = firstPick.pairKey;
+      const matchIndex = bubbles.findIndex((b, i) => !b.matched && i !== firstPick.idx && b.pairKey === targetKey);
+      if(matchIndex === -1) return;
+
+      const elA = gridEl.querySelector(`.bubble[data-index="${firstPick.idx}"]`);
+      const elB = gridEl.querySelector(`.bubble[data-index="${matchIndex}"]`);
+
+      clearHintUI();
+      if(elA) elA.classList.add("hint");
+      if(elB) elB.classList.add("hint");
+
+      setTimeout(()=>{
+        clearHintUI();
+      }, 900);
+    }
+
+    /***********************
+     * 按钮
+     ***********************/
+    hintBtn.addEventListener("click", useHint);
+
+    nextBtn.addEventListener("click", ()=>{
+      round += 1;
+      themeIndex += 1; // 每关换主题
+      buildRound();
+    });
+
+    restartBtn.addEventListener("click", ()=>{
+      currentLevel = 1;
+      round = 1;
+      themeIndex = 0;
+      usedKeysByLevel = { 1:new Set(), 2:new Set(), 3:new Set() };
+      buildRound();
+    });
+
+    speakToggleBtn.addEventListener("click", ()=>{
+      speakEnabled = !speakEnabled;
+      speakToggleBtn.textContent = `朗读：${speakEnabled ? "开" : "关"}`;
+      if(!speakEnabled && ("speechSynthesis" in window)){
+        window.speechSynthesis.cancel();
+      }
+    });
+
+    // 解锁音频上下文（部分浏览器需要先交互）
+    document.addEventListener("pointerdown", ()=>{
+      try{
+        const ctx = getAudio();
+        if(ctx.state === "suspended") ctx.resume();
+      }catch(_){}
+    }, { once:false });
+
+    // 启动
+    buildRound();
+  </script>
+</body>
+</html>
